@@ -28,7 +28,7 @@ Además se deben de respetar algunas REGEX al ingresar los datos.
 | Campo | Regex |
 | ----- | ----- |
 | Código | [A-Z 0-9]|
-| Descripción | [A-Z 0-9 , . !]|
+| Descripción | [A-Z a-z 0-9 , . !]|
 | Unidades | [0-9]|
 | Precio | [0-9]|
 
