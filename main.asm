@@ -28,6 +28,10 @@ nombreConfig            db     "PRA2.CNF", 00
 ;; CREDECIALES
 usuario                     db  "slima", "$"
 clave                       db  "202100154", "$"
+txtErrorCredenciales		db  0a,0a,"-----------------------------",0a,"Credenciales incorrectas. Bye ;D", 0a, "$"
+mensajeSinArchivoConfig	db  0a,0a,"-----------------------------",0a,"No se encontro el archivo de configuracion. Bye ;D", 0a, "$"
+txtBienvenida	db  0a,0a,"-----------------------------",0a,"Bienvenido. salima :D", 0a, "$"
+txtPresionarEnter db  0a,0a,"Presione ENTER para continuar.", 0a, "$"
 
 ; PARA EL USO DE DISTINTAS FUNCIONES
 ;; BUFFER
@@ -51,7 +55,7 @@ separadorPrompt db    "=================",0a,"$"
 regresar     db    "(R)egresar",0a,"$"
 
 ;; ENCABEZADO
-MensajeInicial              db  " Universidad de San Carlos de Guatemala", 0dh, 0ah," Facultad de Ingenieria", 0dh, 0ah," Escuela de Vacaciones ", 0dh, 0ah," Arquitectura de Compiladores y ensabladores 1", 0dh, 0ah," Seccion N", 0a, 0dh, 0ah," Sergio Andre Lima Corado", 0dh, 0ah," 202100154", 0a, "$"
+MensajeInicial              db  " Universidad de San Carlos de Guatemala", 0dh, 0ah," Facultad de Ingenieria", 0dh, 0ah," Escuela de Vacaciones Junio 2023", 0dh, 0ah," Arquitectura de Computadoras y Ensambladores 1", 0dh, 0ah," Seccion N", 0a, 0dh, 0ah," Sergio Andre Lima Corado", 0dh, 0ah," 202100154", 0a, "$"
 ;; MENU PRINCIPAL
 tituloMenu db   "MENU PRINCIPAL",0a,"$"
 separadorMenu     db  "==============",0a,"$"
@@ -106,6 +110,7 @@ separadorSinExistencias      db "========================",0a,"$"
 contadorItemsEnCompra	dw	0000
 
 promptFinDeVenta	db 	0a,0a,"Venta Realizada.",0a,"========================",0a,0a,"$"
+promptConfirmarVenta	db 	0a,0a,"Confirmar venta? (A/C)",0a,"$"
 
 
 ;; MENU HERRAMIENTAS
@@ -349,17 +354,25 @@ inicio:
 		mov cx, 09
 		call cadenas_iguales
 		cmp dl, 0ff
-
-		call tecla_enter
-
-		je menu_principal
-		; SI ES INCORRECTO IMPRIME MENSAJE Y FINALIZA EL PROGRAMA
-		mov DX, offset txtMonto
-	mov AH, 09
-	int 21
+		je credenciales_correctas
+		; SI ES INCORRECTO IMPRIME MENSAJE Y FINALIZA EL PROGRAMA		
 		jmp credenciales_incorrectas_fin
-
+	credenciales_correctas:
+		; IMPRIME MENSAJE DE BIENVENIDA
+		mov DX, offset txtBienvenida
+		mov AH, 09
+		int 21
+		;imprimir presionar enter
+		mov DX, offset txtPresionarEnter
+		mov AH, 09
+		int 21		
+		call tecla_enter
+		jmp menu_principal
 	credenciales_incorrectas_fin:
+		; imprimir mensaje de error en credenciales
+		mov DX, offset txtErrorCredenciales
+		mov AH, 09
+		int 21
 		jmp fin
 
 ;; MENU PRINCIPAL		
@@ -467,7 +480,7 @@ menu_principal:
 			;; SEPARACION
 			mov DX, offset nuevaLinea
 			mov AH, 09
-			int 21
+			int 21			
 			;; IMPRIMIR SUB MENU
 			mov DX, offset tituloProductoMostrar
 			mov AH, 09
@@ -488,6 +501,8 @@ menu_principal:
 				;; leemos
 			;; CICLO PARA LEER ARCHIVO		
 			ciclo_mostrar:
+				cmp [cont_temp], 05
+				je pregunta_enter
 				;; puntero cierta posición
 				mov BX, [handleProductos]
 				mov CX, 0026     ;; leer 26h bytes
@@ -511,10 +526,17 @@ menu_principal:
 				je ciclo_mostrar
 				cmp [cont_temp], 05
 				jb imprimir_producto
+			pregunta_enter:
 				;; preguntar enter para imprimir otros 5 o q para salir
 				mov DX, offset preguntaEnter
 				mov AH, 09
 				int 21
+				mov DX, offset nuevaLinea
+			    mov AH, 09
+			    int 21
+			    mov DX, offset nuevaLinea
+			    mov AH, 09
+			    int 21
 				;; LEER 1 CARACTER
 				mov AH, 08
 				int 21
@@ -1588,7 +1610,7 @@ menu_principal:
 					mov AX, [ventaCantidadNumero]
 					add AX, [contadorItemsEnCompra] ; modificar por contador
 					cmp AX, 000B ; si es mayor a 10, entonces es inválido
-					jb modificar_producto
+					jb confirmar_venta
 				imprimir_error_unidades:
 					; imprimir error
 					mov DX, offset promptError
@@ -1604,7 +1626,19 @@ menu_principal:
 ;;
 				;;sin_existencias_disponibles:
 				;;	jmp agregar_item		
-				
+			confirmar_venta:
+			;preguntar aceptar compra o cancelar
+			mov DX, offset promptConfirmarVenta
+			mov AH, 09
+			int 21
+			; leer tecla ingresada
+			mov AH, 01
+			int 21
+			cmp AL, 63 ; 71 es la tecla q
+			je agregar_item
+			cmp AL, 61 ; 61 es la tecla a
+			je modificar_producto			
+			jmp confirmar_venta
 			modificar_producto:
 				mov al, 02
 				mov dx, offset archivoProductos
@@ -4109,7 +4143,7 @@ validar_acceso:
 	mov DX, offset nombreConfig
 	int 21
 	;; Si no existe el archivo cierra el programa
-	jc fin
+	jc sinArchivoConfig
 	;; Guardar el handle del archivo
 	;jc credenciales_incorrectas_fin
 	mov [handleConfig], AX
@@ -4295,6 +4329,11 @@ copiar_variable:
 	loop copiar_variable
 	ret
 
+sinArchivoConfig:
+	mov AH, 09h
+	mov DX, offset mensajeSinArchivoConfig
+	int 21h
+	jmp fin
 fin:
 .EXIT
 
